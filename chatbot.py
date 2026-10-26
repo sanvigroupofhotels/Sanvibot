@@ -51,7 +51,36 @@ AVAILABLE_MODELS = [
 ]
 
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
-SESSIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_sessions.json")
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SESSIONS_FILE = os.path.join(_BASE_DIR, "chat_sessions.json")
+FAVICON_PATH = os.path.join(_BASE_DIR, "sanvibot_favicon.png")
+
+# Faceted Neural-Spark 'S' Emblem SVG (scales crisply at any size in Sidebar, Topbar, and Hero)
+_SANVIBOT_EMBLEM_SVG = (
+    '<svg class="sanvibot-emblem-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">'
+    '<defs>'
+    '<linearGradient id="sbBadgeBg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">'
+    '<stop offset="0%" stop-color="#1e1b4b"/><stop offset="55%" stop-color="#1e1638"/><stop offset="100%" stop-color="#0f172a"/>'
+    '</linearGradient>'
+    '<linearGradient id="sbNeuralGrad" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">'
+    '<stop offset="0%" stop-color="#fde68a"/><stop offset="45%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#8b5cf6"/>'
+    '</linearGradient>'
+    '</defs>'
+    '<rect x="2" y="2" width="60" height="60" rx="16" fill="url(#sbBadgeBg)" stroke="url(#sbNeuralGrad)" stroke-width="2" stroke-opacity="0.75"/>'
+    '<path d="M32 11L49 20L41 26L32 20L21 25L19 33L28 39" stroke="url(#sbNeuralGrad)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<path d="M32 53L15 44L23 38L32 44L43 39L45 31L36 25" stroke="url(#sbNeuralGrad)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<line x1="32" y1="11" x2="32" y2="20" stroke="#fde68a" stroke-width="1.8" opacity="0.8"/>'
+    '<line x1="21" y1="25" x2="32" y2="11" stroke="#fbbf24" stroke-width="1.5" opacity="0.65"/>'
+    '<line x1="43" y1="39" x2="32" y2="53" stroke="#a78bfa" stroke-width="1.5" opacity="0.7"/>'
+    '<line x1="32" y1="44" x2="32" y2="53" stroke="#8b5cf6" stroke-width="1.8" opacity="0.8"/>'
+    '<circle cx="32" cy="20" r="2.6" fill="#fde68a"/>'
+    '<circle cx="21" cy="25" r="2.5" fill="#fbbf24"/>'
+    '<circle cx="43" cy="39" r="2.5" fill="#a78bfa"/>'
+    '<circle cx="32" cy="44" r="2.6" fill="#c084fc"/>'
+    '<path d="M32 23.5L34.3 29.7L40.5 32L34.3 34.3L32 40.5L29.7 34.3L23.5 32L29.7 29.7L32 23.5Z" fill="#fde68a"/>'
+    '<path d="M50 15L51 17.5L53.5 18.5L51 19.5L50 22L49 19.5L46.5 18.5L49 17.5L50 15Z" fill="#fbbf24" opacity="0.9"/>'
+    '</svg>'
+)
 
 
 def get_api_key() -> str:
@@ -693,22 +722,67 @@ def render_sidebar_chat_item(
 
 
 def run_streamlit_app():
-    """SanviBot interface matching reference screenshot."""
+    """SanviBot interface matching reference screenshot with full Dark & Light mode support."""
     st.set_page_config(
         page_title="SanviBot | AI Assistant",
-        page_icon="✨",
+        page_icon=FAVICON_PATH if os.path.exists(FAVICON_PATH) else "✨",
         layout="centered",
         initial_sidebar_state="expanded",
     )
 
-    # Reference Screenshot-Matched Pixel-Perfect CSS
+    # Reference Screenshot-Matched Pixel-Perfect CSS (Adaptive to Dark Mode & Light Mode)
     sanvibot_css = """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
+        :root {
+            --sb-text-primary: #f4f4f5;
+            --sb-text-secondary: #d4d4d8;
+            --sb-text-muted: #71717a;
+            --sb-sidebar-bg: #17171a;
+            --sb-sidebar-text: #d1d1d6;
+            --sb-sidebar-text-active: #ffffff;
+            --sb-sidebar-hover: rgba(255, 255, 255, 0.07);
+            --sb-sidebar-active-bg: #38383a;
+            --sb-border: rgba(255, 255, 255, 0.14);
+            --sb-border-subtle: rgba(255, 255, 255, 0.10);
+            --sb-surface: rgba(255, 255, 255, 0.04);
+            --sb-surface-hover: rgba(255, 255, 255, 0.08);
+            --sb-user-bubble-bg: #27272a;
+            --sb-user-bubble-text: #f4f4f5;
+            --sb-popover-bg: #1e1e21;
+            --sb-fab-bg: #27272a;
+            --sb-fab-text: #a1a1aa;
+            --sb-fab-hover-bg: #3f3f46;
+            --sb-fab-hover-text: #ffffff;
+        }
+
+        :root[data-sanvi-theme="light"],
+        html[data-sanvi-theme="light"],
+        body[data-sanvi-theme="light"] {
+            --sb-text-primary: #18181b;
+            --sb-text-secondary: #27272a;
+            --sb-text-muted: #52525b;
+            --sb-sidebar-bg: #f4f4f5;
+            --sb-sidebar-text: #27272a;
+            --sb-sidebar-text-active: #09090b;
+            --sb-sidebar-hover: rgba(0, 0, 0, 0.06);
+            --sb-sidebar-active-bg: #e4e4e7;
+            --sb-border: rgba(0, 0, 0, 0.15);
+            --sb-border-subtle: rgba(0, 0, 0, 0.10);
+            --sb-surface: rgba(0, 0, 0, 0.03);
+            --sb-surface-hover: rgba(0, 0, 0, 0.07);
+            --sb-user-bubble-bg: #f4f4f5;
+            --sb-user-bubble-text: #18181b;
+            --sb-popover-bg: #ffffff;
+            --sb-fab-bg: #ffffff;
+            --sb-fab-text: #3f3f46;
+            --sb-fab-hover-bg: #f4f4f5;
+            --sb-fab-hover-text: #09090b;
+        }
+
         html, body, [class*="css"] {
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            color-scheme: dark;
         }
 
         /* Streamlit Header adjustments */
@@ -733,7 +807,7 @@ def run_streamlit_app():
             padding: 0.6rem 0.2rem 1rem;
             margin-top: 0.2rem;
             margin-bottom: 1.25rem;
-            border-bottom: 1px solid rgba(128, 128, 128, 0.16);
+            border-bottom: 1px solid var(--sb-border-subtle);
         }
 
         .sanvibot-title {
@@ -743,7 +817,83 @@ def run_streamlit_app():
             align-items: center;
             gap: 8px;
             letter-spacing: -0.01em;
-            color: #f4f4f5;
+            color: var(--sb-text-primary) !important;
+        }
+
+        /* SanviBot Brand Lockups (Sidebar, Topbar, Hero Home Page) */
+        .sanvibot-brand-wordmark {
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--sb-text-primary);
+            display: inline-flex;
+            align-items: baseline;
+        }
+        .sanvibot-brand-wordmark .brand-bot-accent {
+            background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #6366f1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .sanvibot-sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 2px 4px 10px 4px;
+            margin-bottom: 2px;
+            user-select: none;
+        }
+        .sanvibot-sidebar-brand .sanvibot-emblem-svg {
+            width: 30px;
+            height: 30px;
+            flex-shrink: 0;
+            filter: drop-shadow(0 2px 6px rgba(99, 102, 241, 0.25));
+        }
+        .sanvibot-sidebar-brand .sanvibot-brand-wordmark {
+            font-size: 1.12rem;
+        }
+
+        .sanvibot-topbar-brand-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 9px 3px 4px;
+            border-radius: 9999px;
+            background: var(--sb-surface);
+            border: 1px solid var(--sb-border-subtle);
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .sanvibot-topbar-brand-pill .sanvibot-emblem-svg {
+            width: 22px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .sanvibot-topbar-brand-pill .sanvibot-brand-wordmark {
+            font-size: 0.85rem;
+        }
+
+        .hero-brand-lockup {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 10px 24px 10px 12px;
+            border-radius: 9999px;
+            background: var(--sb-surface);
+            border: 1px solid var(--sb-border);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+            margin-bottom: 1.15rem;
+            user-select: none;
+        }
+        .hero-brand-lockup .sanvibot-emblem-svg {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            filter: drop-shadow(0 4px 10px rgba(245, 158, 11, 0.28));
+        }
+        .hero-brand-lockup .sanvibot-brand-wordmark {
+            font-size: clamp(1.55rem, 1.2rem + 1.5vw, 2.05rem);
         }
 
         .model-pill {
@@ -759,7 +909,7 @@ def run_streamlit_app():
 
         /* Sidebar Container */
         [data-testid="stSidebar"] {
-            background-color: #17171a !important;
+            background-color: var(--sb-sidebar-bg) !important;
         }
         [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
             padding: 0.6rem 0.7rem 1rem 0.7rem !important;
@@ -817,7 +967,7 @@ def run_streamlit_app():
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
-            color: #a1a1aa !important;
+            color: var(--sb-text-muted) !important;
             font-size: 1.25rem !important;
             line-height: 1 !important;
             font-weight: 500 !important;
@@ -836,8 +986,8 @@ def run_streamlit_app():
         }
         div[class*="st-key-nav_arrow_"] button:hover,
         [data-testid="stSidebar"] div[class*="st-key-nav_arrow_"] button:hover {
-            background-color: rgba(255, 255, 255, 0.12) !important;
-            color: #ffffff !important;
+            background-color: var(--sb-surface-hover) !important;
+            color: var(--sb-sidebar-text-active) !important;
         }
         div[class*="st-key-nav_arrow_"] button p,
         [data-testid="stSidebar"] div[class*="st-key-nav_arrow_"] button p {
@@ -854,8 +1004,8 @@ def run_streamlit_app():
         .new-chat-btn button {
             background: transparent !important;
             background-color: transparent !important;
-            color: #e4e4e7 !important;
-            border: 1px solid rgba(255, 255, 255, 0.14) !important;
+            color: var(--sb-sidebar-text) !important;
+            border: 1px solid var(--sb-border) !important;
             font-weight: 500 !important;
             border-radius: 8px !important;
             padding: 0.4rem 0.75rem !important;
@@ -871,10 +1021,10 @@ def run_streamlit_app():
         div[class*="st-key-btn_new_chat"] button:hover,
         div[class*="st-key-new_chat_btn_container"] button:hover,
         .new-chat-btn button:hover {
-            background: rgba(255, 255, 255, 0.08) !important;
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
-            border-color: rgba(255, 255, 255, 0.25) !important;
+            background: var(--sb-surface-hover) !important;
+            background-color: var(--sb-surface-hover) !important;
+            color: var(--sb-sidebar-text-active) !important;
+            border-color: var(--sb-border) !important;
         }
         div[class*="st-key-btn_new_chat"] button p,
         div[class*="st-key-new_chat_btn_container"] button p,
@@ -891,16 +1041,16 @@ def run_streamlit_app():
             margin-bottom: 4px !important;
         }
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
-            background-color: rgba(255, 255, 255, 0.04) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background-color: var(--sb-surface) !important;
+            border: 1px solid var(--sb-border-subtle) !important;
             border-radius: 8px !important;
-            color: #e4e4e7 !important;
+            color: var(--sb-sidebar-text) !important;
             font-size: 0.84rem !important;
             padding: 0.35rem 0.7rem !important;
         }
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input:focus {
-            border-color: rgba(255, 255, 255, 0.25) !important;
-            background-color: rgba(255, 255, 255, 0.07) !important;
+            border-color: var(--sb-border) !important;
+            background-color: var(--sb-surface-hover) !important;
         }
 
         /* Group Headings: matching chat item vertical height and spacing (same distance as between chats) */
@@ -960,7 +1110,7 @@ def run_streamlit_app():
         .group-header-row [data-testid="stPopover"] button {
             background: transparent !important;
             background-color: transparent !important;
-            color: #a1a1aa !important;
+            color: var(--sb-text-muted) !important;
             font-size: 1.1rem !important;
             width: 22px !important;
             height: 22px !important;
@@ -978,16 +1128,16 @@ def run_streamlit_app():
         }
         div[class*="st-key-group_header_"] [data-testid="stPopover"] button:hover,
         .group-header-row [data-testid="stPopover"] button:hover {
-            background: rgba(255, 255, 255, 0.12) !important;
-            background-color: rgba(255, 255, 255, 0.12) !important;
-            color: #ffffff !important;
+            background: var(--sb-surface-hover) !important;
+            background-color: var(--sb-surface-hover) !important;
+            color: var(--sb-sidebar-text-active) !important;
         }
 
         .simple-group-header {
             display: flex !important;
             align-items: center !important;
             justify-content: space-between !important;
-            color: #ffffff !important;
+            color: var(--sb-sidebar-text-active) !important;
             font-size: 0.86rem !important;
             font-weight: 600 !important;
             height: 28px !important;
@@ -1008,14 +1158,14 @@ def run_streamlit_app():
             margin-bottom: 6px !important;
         }
         [data-testid="stSidebar"] div[data-testid="stSelectbox"] > div {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            background-color: var(--sb-surface) !important;
+            border: 1px solid var(--sb-border) !important;
             border-radius: 8px !important;
-            color: #e4e4e7 !important;
+            color: var(--sb-sidebar-text) !important;
             font-size: 0.86rem !important;
         }
         [data-testid="stSidebar"] div[data-testid="stSelectbox"] > div:hover {
-            border-color: rgba(255, 255, 255, 0.25) !important;
+            border-color: var(--sb-text-muted) !important;
         }
 
         /* Voice input microphone button before send button */
@@ -1034,14 +1184,14 @@ def run_streamlit_app():
             padding: 0 !important;
             margin: 0 4px 0 0 !important;
             border-radius: 50% !important;
-            color: #a1a1aa !important;
+            color: var(--sb-text-muted) !important;
             transition: all 0.15s ease !important;
             flex-shrink: 0 !important;
             align-self: center !important;
         }
         #voice-mic-btn:hover {
-            color: #ffffff !important;
-            background: rgba(255, 255, 255, 0.12) !important;
+            color: var(--sb-text-primary) !important;
+            background: var(--sb-surface-hover) !important;
         }
         #voice-mic-btn.recording {
             color: #ef4444 !important;
@@ -1080,7 +1230,7 @@ def run_streamlit_app():
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
-            color: #ffffff !important;
+            color: var(--sb-sidebar-text-active) !important;
         }
 
         /* =========================================================
@@ -1136,10 +1286,10 @@ def run_streamlit_app():
         div[class*="st-key-chat_item_"] [data-testid="stHorizontalBlock"]:hover,
         .chat-item-row [data-testid="stHorizontalBlock"]:hover,
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.stButton):has([data-testid="stPopover"]):hover {
-            background: rgba(255, 255, 255, 0.07) !important;
+            background: var(--sb-sidebar-hover) !important;
         }
 
-        /* Active Chat Row: Soft dark rounded rectangle #38383a */
+        /* Active Chat Row: Soft rounded rectangle (#38383a in dark mode, #e4e4e7 in light mode) */
         div[class*="st-key-chat_item_active_"] [data-testid="stHorizontalBlock"],
         div[class*="st-key-chat_item_"] [data-testid="stHorizontalBlock"]:has(button[kind="primary"]),
         div[class*="st-key-chat_item_"] [data-testid="stHorizontalBlock"]:has([data-testid="stBaseButton-primary"]),
@@ -1147,8 +1297,8 @@ def run_streamlit_app():
         .chat-item-row [data-testid="stHorizontalBlock"]:has([data-testid="stBaseButton-primary"]),
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(button[kind="primary"]),
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has([data-testid="stBaseButton-primary"]) {
-            background: #38383a !important;
-            background-color: #38383a !important;
+            background: var(--sb-sidebar-active-bg) !important;
+            background-color: var(--sb-sidebar-active-bg) !important;
             border-radius: 6px !important;
         }
 
@@ -1188,7 +1338,7 @@ def run_streamlit_app():
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
-            color: #d1d1d6 !important;
+            color: var(--sb-sidebar-text) !important;
             font-size: 0.85rem !important;
             font-weight: 400 !important;
             text-align: left !important;
@@ -1235,7 +1385,7 @@ def run_streamlit_app():
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-            color: #d1d1d6 !important;
+            color: var(--sb-sidebar-text) !important;
             font-size: 0.85rem !important;
             font-weight: 400 !important;
             line-height: 28px !important;
@@ -1248,7 +1398,7 @@ def run_streamlit_app():
         div[class*="st-key-chat_item_"] button[kind="primary"] p,
         .chat-item-row [data-testid="stHorizontalBlock"]:has(button[kind="primary"]) button p,
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(button[kind="primary"]) button p {
-            color: #ffffff !important;
+            color: var(--sb-sidebar-text-active) !important;
             font-weight: 500 !important;
         }
 
@@ -1305,7 +1455,7 @@ def run_streamlit_app():
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
-            color: #9ca3af !important;
+            color: var(--sb-text-muted) !important;
             font-size: 1.15rem !important;
             padding: 0 !important;
             margin: 0 !important;
@@ -1322,9 +1472,9 @@ def run_streamlit_app():
         div[class*="st-key-chat_item_"] [data-testid="stPopover"] button:hover,
         .chat-item-row [data-testid="stPopover"] button:hover,
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.stButton):has([data-testid="stPopover"]) [data-testid="stPopover"] button:hover {
-            color: #ffffff !important;
-            background: rgba(255, 255, 255, 0.12) !important;
-            background-color: rgba(255, 255, 255, 0.12) !important;
+            color: var(--sb-sidebar-text-active) !important;
+            background: var(--sb-surface-hover) !important;
+            background-color: var(--sb-surface-hover) !important;
         }
 
         /* Explicitly format inner wrappers, markdown container, and p for the three dots so they are never clipped or pushed */
@@ -1357,7 +1507,7 @@ def run_streamlit_app():
             text-align: center !important;
             width: 100% !important;
             height: 100% !important;
-            color: #9ca3af !important;
+            color: var(--sb-text-muted) !important;
             font-size: 1.15rem !important;
             font-weight: 700 !important;
             line-height: 1 !important;
@@ -1370,7 +1520,7 @@ def run_streamlit_app():
         div[class*="st-key-chat_item_"] [data-testid="stPopover"] button:hover p,
         .chat-item-row [data-testid="stPopover"] button:hover p,
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.stButton):has([data-testid="stPopover"]) [data-testid="stPopover"] button:hover p {
-            color: #ffffff !important;
+            color: var(--sb-sidebar-text-active) !important;
         }
 
         /* Completely hide the chevron down-arrow in stPopover across all popovers (must beat chat_item button div specificity) */
@@ -1397,11 +1547,11 @@ def run_streamlit_app():
            Strict Left-Aligned, Tight Vertical Spacing, No Gaps
            ========================================================= */
         div[data-testid="stPopoverBody"] {
-            background-color: #1e1e21 !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background-color: var(--sb-popover-bg) !important;
+            border: 1px solid var(--sb-border) !important;
             border-radius: 10px !important;
             padding: 4px !important;
-            box-shadow: 0 10px 32px rgba(0, 0, 0, 0.75) !important;
+            box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35) !important;
             min-width: 190px !important;
             max-width: 220px !important;
         }
@@ -1429,7 +1579,7 @@ def run_streamlit_app():
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
-            color: #e4e4e7 !important;
+            color: var(--sb-text-secondary) !important;
             font-size: 0.85rem !important;
             font-weight: 400 !important;
             text-align: left !important;
@@ -1450,8 +1600,8 @@ def run_streamlit_app():
 
         div[data-testid="stPopoverBody"] button:hover,
         div[data-testid="stPopoverBody"] [data-testid="stBaseButton-secondary"]:hover {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
+            background-color: var(--sb-surface-hover) !important;
+            color: var(--sb-text-primary) !important;
         }
 
         /* Force inner wrappers to strictly left-align */
@@ -1493,7 +1643,7 @@ def run_streamlit_app():
             margin: 0 !important;
             height: 28px !important;
             box-sizing: border-box !important;
-            color: #e4e4e7 !important;
+            color: var(--sb-text-secondary) !important;
             font-size: 0.85rem !important;
             font-weight: 400 !important;
             text-decoration: none !important;
@@ -1502,8 +1652,8 @@ def run_streamlit_app():
             width: 100% !important;
         }
         .claude-menu-link:hover {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
+            background-color: var(--sb-surface-hover) !important;
+            color: var(--sb-text-primary) !important;
             text-decoration: none !important;
         }
         .claude-menu-link .item-left {
@@ -1513,11 +1663,11 @@ def run_streamlit_app():
             color: inherit !important;
         }
         .claude-menu-link svg {
-            color: #9ca3af !important;
+            color: var(--sb-text-muted) !important;
             flex-shrink: 0 !important;
         }
         .claude-menu-link:hover svg {
-            color: #ffffff !important;
+            color: var(--sb-text-primary) !important;
         }
 
         /* Line separator in popover menus - tight symmetrical spacing */
@@ -1529,7 +1679,7 @@ def run_streamlit_app():
             min-height: 1px !important;
             max-height: 1px !important;
             border: none !important;
-            background: rgba(255, 255, 255, 0.1) !important;
+            background: var(--sb-border-subtle) !important;
             margin: 3px 0 !important;
             margin-top: 3px !important;
             margin-bottom: 3px !important;
@@ -1609,10 +1759,10 @@ def run_streamlit_app():
             align-items: center;
             gap: 8px;
             padding: 6px 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: var(--sb-surface);
+            border: 1px solid var(--sb-border-subtle);
             border-radius: 8px;
-            color: #d1d1d6;
+            color: var(--sb-text-secondary);
             font-size: 0.90rem;
             font-weight: 500;
             margin: 4px 0;
@@ -1627,7 +1777,7 @@ def run_streamlit_app():
             line-height: 1;
         }
         .cooking-text {
-            color: #e4e4e7;
+            color: var(--sb-text-primary);
             font-family: inherit;
             letter-spacing: -0.01em;
         }
@@ -1640,14 +1790,19 @@ def run_streamlit_app():
             margin-bottom: 1.25rem;
         }
         .user-bubble-wrapper [data-testid="stChatMessage"] {
-            background-color: #27272a !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            background-color: var(--sb-user-bubble-bg) !important;
+            border: 1px solid var(--sb-border-subtle) !important;
             border-radius: 18px !important;
             padding: 0.85rem 1.25rem !important;
             max-width: 82% !important;
             margin-left: auto !important;
-            color: #f4f4f5 !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            color: var(--sb-user-bubble-text) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        }
+        .user-bubble-wrapper [data-testid="stChatMessage"] p,
+        .user-bubble-wrapper [data-testid="stChatMessage"] span,
+        .user-bubble-wrapper [data-testid="stChatMessage"] li {
+            color: var(--sb-user-bubble-text) !important;
         }
         .user-bubble-wrapper [data-testid="stChatMessageAvatar"] {
             display: none !important;
@@ -1661,9 +1816,18 @@ def run_streamlit_app():
             background: transparent !important;
             border: none !important;
             padding: 0.4rem 0 !important;
-            color: #f4f4f5 !important;
+            color: var(--sb-text-primary) !important;
             font-size: 0.98rem !important;
             line-height: 1.68 !important;
+        }
+        .bot-bubble-wrapper [data-testid="stChatMessage"] p,
+        .bot-bubble-wrapper [data-testid="stChatMessage"] li,
+        .bot-bubble-wrapper [data-testid="stChatMessage"] h1,
+        .bot-bubble-wrapper [data-testid="stChatMessage"] h2,
+        .bot-bubble-wrapper [data-testid="stChatMessage"] h3,
+        .bot-bubble-wrapper [data-testid="stChatMessage"] h4,
+        .bot-bubble-wrapper [data-testid="stChatMessage"] strong {
+            color: var(--sb-text-primary) !important;
         }
         .bot-bubble-wrapper [data-testid="stChatMessageAvatar"] {
             display: none !important;
@@ -1671,9 +1835,9 @@ def run_streamlit_app():
 
         /* Centered New Chat State */
         .hero-center-box {
-            margin-top: 15vh;
-            margin-top: 15dvh;
-            margin-bottom: 2rem;
+            margin-top: 12vh;
+            margin-top: 12dvh;
+            margin-bottom: 1.8rem;
             text-align: center;
         }
         .hero-sparkle {
@@ -1683,12 +1847,12 @@ def run_streamlit_app():
         .hero-greeting {
             font-size: clamp(1.4rem, 1rem + 2vw, 1.95rem); /* 1.95rem on desktop; fluidly scales on mobile */
             font-weight: 700;
-            color: #f4f4f5;
+            color: var(--sb-text-primary) !important;
             letter-spacing: -0.02em;
             margin-bottom: 0.4rem;
         }
         .hero-subtitle {
-            color: #71717a;
+            color: var(--sb-text-muted) !important;
             font-size: 0.98rem;
             margin-bottom: 1.8rem;
         }
@@ -1709,13 +1873,13 @@ def run_streamlit_app():
             padding: 0 !important;
         }
         [data-testid="stForm"] input {
-            background-color: #212124 !important;
-            border: 1px solid rgba(255, 255, 255, 0.16) !important;
+            background-color: var(--sb-surface) !important;
+            border: 1px solid var(--sb-border) !important;
             border-radius: 28px !important;
             padding: 0.85rem 1.4rem !important;
             font-size: 1rem !important;
-            color: #ffffff !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+            color: var(--sb-text-primary) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18) !important;
         }
         [data-testid="stForm"] button {
             border-radius: 28px !important;
@@ -1731,21 +1895,21 @@ def run_streamlit_app():
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            background: #27272a;
-            color: #a1a1aa;
-            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: var(--sb-fab-bg);
+            color: var(--sb-fab-text);
+            border: 1px solid var(--sb-border);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             font-size: 15px;
             z-index: 999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.22);
             transition: all 0.2s ease;
         }
         .scroll-down-fab:hover {
-            background: #3f3f46;
-            color: #ffffff;
+            background: var(--sb-fab-hover-bg);
+            color: var(--sb-fab-hover-text);
             transform: translateY(-2px);
         }
         @media (max-width: 900px) {
@@ -1759,32 +1923,38 @@ def run_streamlit_app():
             border-radius: 26px !important;
         }
         div[class*="st-key-hero_chat_input_box"] [data-testid="stChatInput"] {
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.16) !important;
         }
 
-        /* Hero Suggestion Chips (Desktop & Mobile) */
+        /* Hero Suggestion Chips (Desktop & Mobile, Dark & Light Mode) */
         div[class*="st-key-hero_suggestions_box"] button {
-            background-color: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background-color: var(--sb-surface) !important;
+            border: 1px solid var(--sb-border-subtle) !important;
             border-radius: 12px !important;
             padding: 0.62rem 1rem !important;
-            color: #d4d4d8 !important;
+            color: var(--sb-text-secondary) !important;
             font-size: 0.88rem !important;
             font-weight: 500 !important;
             transition: all 0.15s ease !important;
         }
+        div[class*="st-key-hero_suggestions_box"] button p {
+            color: var(--sb-text-secondary) !important;
+        }
         div[class*="st-key-hero_suggestions_box"] button:hover {
-            background-color: rgba(255, 255, 255, 0.07) !important;
-            border-color: rgba(255, 255, 255, 0.22) !important;
-            color: #ffffff !important;
+            background-color: var(--sb-surface-hover) !important;
+            border-color: var(--sb-border) !important;
+            color: var(--sb-text-primary) !important;
             transform: translateY(-1px);
+        }
+        div[class*="st-key-hero_suggestions_box"] button:hover p {
+            color: var(--sb-text-primary) !important;
         }
 
         /* Bottom disclaimer caption */
         .bottom-disclaimer {
             text-align: center;
             font-size: 0.74rem;
-            color: #71717a;
+            color: var(--sb-text-muted);
             margin-top: 0.4rem;
         }
 
@@ -1827,13 +1997,21 @@ def run_streamlit_app():
 
             .sanvibot-topbar-left {
                 padding-top: 0.1rem !important;
+                gap: 0.5rem !important;
+            }
+            .sanvibot-topbar-brand-pill {
+                padding: 3px 9px 3px 5px !important;
+                gap: 6px !important;
+            }
+            .sanvibot-topbar-brand-pill .sanvibot-brand-text {
+                font-size: 0.86rem !important;
             }
             .sanvibot-title {
-                font-size: 1.02rem !important;
+                font-size: 0.98rem !important;
                 white-space: nowrap !important;
                 overflow: hidden !important;
                 text-overflow: ellipsis !important;
-                max-width: 82vw !important;
+                max-width: 54vw !important;
             }
 
             /* Compact hero section on mobile so greeting, input, and chips fit comfortably */
@@ -1842,9 +2020,12 @@ def run_streamlit_app():
                 margin-top: 4dvh !important;
                 margin-bottom: 1.1rem !important;
             }
-            .hero-sparkle {
-                font-size: 2rem !important;
-                margin-bottom: 0.35rem !important;
+            .sanvibot-hero-brand-pill {
+                padding: 6px 15px 6px 8px !important;
+                gap: 9px !important;
+            }
+            .sanvibot-hero-brand-pill .sanvibot-brand-text {
+                font-size: 1.18rem !important;
             }
             .hero-subtitle {
                 font-size: 0.88rem !important;
@@ -1987,8 +2168,15 @@ def run_streamlit_app():
 
     if "chat_id" in query_params and query_params["chat_id"] in sessions:
         sessions_data["active_chat_id"] = query_params["chat_id"]
+        st.session_state["sanvi_booted_to_home"] = True
         st.query_params.clear()
         save_sessions_data(sessions_data)
+
+    # Always launch directly into the Home Page (New Chat window) whenever the app is newly opened
+    if not st.session_state.get("sanvi_booted_to_home"):
+        st.session_state["sanvi_booted_to_home"] = True
+        if "action" not in query_params and "nav" not in query_params:
+            sessions_data["active_chat_id"] = DRAFT_CHAT_ID
 
     active_chat_id = sessions_data["active_chat_id"]
 
@@ -2073,8 +2261,19 @@ def run_streamlit_app():
         api_ready = False
         api_error_msg = str(e)
 
-    # --- SIDEBAR (MATCHING REFERENCE CLAUDE SCREENSHOT) ---
+    # --- SIDEBAR (MATCHING REFERENCE CLAUDE SCREENSHOT + SANVIBOT BRANDING) ---
     with st.sidebar:
+        # SanviBot Brand Header at Top of Left Sidebar
+        st.markdown(
+            f"""
+            <div class="sanvibot-sidebar-brand">
+                {_SANVIBOT_EMBLEM_SVG}
+                <span class="sanvibot-brand-wordmark">Sanvi<span class="brand-bot-accent">Bot</span></span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
         # Model Selection Dropdown
         default_model_idx = AVAILABLE_MODELS.index(st.session_state.get("selected_model", DEFAULT_MODEL)) if st.session_state.get("selected_model", DEFAULT_MODEL) in AVAILABLE_MODELS else 0
         selected_model = st.selectbox(
@@ -2145,7 +2344,7 @@ def run_streamlit_app():
                         <div class="simple-group-header">
                             <div class="group-title">
                                 <span>{grp}</span>
-                                <span style="color: #71717a; font-size: 0.75rem;">▾</span>
+                                <span style="color: var(--sb-text-muted); font-size: 0.75rem;">▾</span>
                             </div>
                         </div>
                         """,
@@ -2205,7 +2404,7 @@ def run_streamlit_app():
                     <div class="simple-group-header">
                         <div class="group-title">
                             <span>Ungrouped</span>
-                            <span style="color: #71717a; font-size: 0.75rem;">▾</span>
+                            <span style="color: var(--sb-text-muted); font-size: 0.75rem;">▾</span>
                         </div>
                     </div>
                     """,
@@ -2225,9 +2424,14 @@ def run_streamlit_app():
     active_title = current_session.get("title", "New Chat")
     st.markdown(
         f"""
-        <div class="sanvibot-topbar-left" style="display: flex; align-items: center; gap: 8px; padding-top: 0.2rem;">
-            <span class="sanvibot-title" style="font-size: 1.15rem; font-weight: 600; color: #f4f4f5;">{active_title}</span>
-            <span style="color: #71717a; font-size: 0.82rem;">▾</span>
+        <div class="sanvibot-topbar-left" style="display: flex; align-items: center; gap: 10px; padding-top: 0.2rem;">
+            <span class="sanvibot-topbar-brand-pill">
+                {_SANVIBOT_EMBLEM_SVG}
+                <span class="sanvibot-brand-wordmark">Sanvi<span class="brand-bot-accent">Bot</span></span>
+            </span>
+            <span style="color: var(--sb-text-muted); font-size: 0.9rem;">/</span>
+            <span class="sanvibot-title" style="font-size: 1.12rem; font-weight: 600;">{active_title}</span>
+            <span style="color: var(--sb-text-muted); font-size: 0.82rem;">▾</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2244,9 +2448,12 @@ def run_streamlit_app():
     # --- CASE 1: INITIAL NEW CHAT (VERTICALLY CENTERED IN THE MIDDLE OF PAGE) ---
     if not current_messages and not pending_prompt:
         st.markdown(
-            """
+            f"""
             <div class="hero-center-box">
-                <div class="hero-sparkle">✨</div>
+                <div class="hero-brand-lockup">
+                    {_SANVIBOT_EMBLEM_SVG}
+                    <span class="sanvibot-brand-wordmark">Sanvi<span class="brand-bot-accent">Bot</span></span>
+                </div>
                 <div class="hero-greeting">What can I help with today?</div>
                 <p class="hero-subtitle">Ask anything, draft content, summarize documents, or write code.</p>
             </div>
@@ -2563,6 +2770,33 @@ def run_streamlit_app():
                     console.error("setupScrollFab error:", err);
                 }
             }
+            function syncSanviTheme() {
+                try {
+                    const doc = getAppDoc();
+                    const win = getAppWin();
+                    if (!doc || !win) return;
+                    const appEl = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.querySelector('[data-testid="stApp"]') || doc.body;
+                    if (!appEl) return;
+                    const bg = win.getComputedStyle(appEl).backgroundColor || '';
+                    const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+                    let theme = 'dark';
+                    if (m) {
+                        const r = parseInt(m[1], 10);
+                        const g = parseInt(m[2], 10);
+                        const b = parseInt(m[3], 10);
+                        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                        if (lum > 160) {
+                            theme = 'light';
+                        }
+                    }
+                    if (doc.documentElement.getAttribute('data-sanvi-theme') !== theme) {
+                        doc.documentElement.setAttribute('data-sanvi-theme', theme);
+                    }
+                    if (doc.body && doc.body.getAttribute('data-sanvi-theme') !== theme) {
+                        doc.body.setAttribute('data-sanvi-theme', theme);
+                    }
+                } catch(err) {}
+            }
             function setupInstantClickFeedback() {
                 try {
                     const doc = getAppDoc();
@@ -2574,7 +2808,7 @@ def run_streamlit_app():
                         styleEl.id = 'sanvi-optimistic-css';
                         styleEl.textContent =
                             '[data-testid="stSidebar"].sanvi-opt-switching div[class*="st-key-chat_item_"] > [data-testid="stHorizontalBlock"] { background: transparent !important; }' +
-                            '[data-testid="stSidebar"].sanvi-opt-switching div[class*="st-key-chat_item_"].sanvi-opt-target > [data-testid="stHorizontalBlock"] { background: #38383a !important; border-radius: 8px !important; }';
+                            '[data-testid="stSidebar"].sanvi-opt-switching div[class*="st-key-chat_item_"].sanvi-opt-target > [data-testid="stHorizontalBlock"] { background: var(--sb-sidebar-active-bg) !important; border-radius: 8px !important; }';
                         doc.head.appendChild(styleEl);
                     }
 
@@ -2669,7 +2903,8 @@ def run_streamlit_app():
                     console.error("setupInstantClickFeedback error:", err);
                 }
             }
-            window.setInterval(function() { setupVoiceMic(); setupScrollFab(); setupInstantClickFeedback(); }, 250);
+            window.setInterval(function() { syncSanviTheme(); setupVoiceMic(); setupScrollFab(); setupInstantClickFeedback(); }, 250);
+            syncSanviTheme();
             setupVoiceMic();
             setupScrollFab();
             setupInstantClickFeedback();

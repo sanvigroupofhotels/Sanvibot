@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <defs>
+    <linearGradient id="sbBg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="55%" stop-color="#1e1638"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="sbGold" x1="12" y1="10" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="sbIndigo" x1="14" y1="14" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+  </defs>
+  <!-- Squircle Badge (high contrast in both Dark and Light mode) -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#sbBg)" stroke="url(#sbGold)" stroke-width="2" stroke-opacity="0.65"/>
+  <!-- Outer Neural Nodes -->
+  <circle cx="48" cy="16" r="2.6" fill="#fbbf24"/>
+  <circle cx="16" cy="48" r="2.6" fill="#818cf8"/>
+  <!-- Stylized Geometric 'S' + AI Spark -->
+  <path d="M39.5 17.5C35.5 14.5 27.5 14.8 24 18.5C20.5 22.2 22.2 27.5 27.8 29.8L36.2 33.2C41.8 35.5 43.5 40.8 40 44.5C36.5 48.2 28.5 48.5 24.5 45.5" stroke="url(#sbGold)" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Four-Point AI Starburst Accent at Top-Right -->
+  <path d="M46 11L47.4 14.6L51 16L47.4 17.4L46 21L44.6 17.4L41 16L44.6 14.6L46 11Z" fill="#fde68a"/>
+  <!-- Subtle Inner Glow Ring -->
+  <circle cx="32" cy="32" r="22" stroke="url(#sbIndigo)" stroke-width="1" stroke-dasharray="3 5" opacity="0.45"/>
+</svg>
