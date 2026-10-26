@@ -164,16 +164,16 @@ def load_sessions_data() -> Dict[str, Any]:
         except Exception:
             pass
 
-    # Create default session matching screenshot
-    initial_id = "chat_photo_edit"
+    # Create default session
+    initial_id = "chat_default"
     initial_data = {
         "active_chat_id": initial_id,
-        "groups": ["Sanvi"],
+        "groups": [],
         "sessions": {
             initial_id: {
                 "id": initial_id,
-                "title": "Photo edit: boy climbing airplane steps",
-                "group": "Sanvi",
+                "title": "New Chat",
+                "group": None,
                 "created_at": time.time(),
                 "updated_at": time.time(),
                 "pinned": False,
