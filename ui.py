@@ -200,5 +200,18 @@ def main():
         print("[*] Application closed.")
 
 
+def _is_running_inside_streamlit() -> bool:
+    """Detect if ui.py is being executed by `streamlit run ui.py` (e.g. on Streamlit Community Cloud)."""
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        return get_script_run_ctx() is not None
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
-    main()
+    if _is_running_inside_streamlit():
+        from chatbot import run_streamlit_app
+        run_streamlit_app()
+    else:
+        main()
