@@ -31,6 +31,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 from tools import ALL_TOOLS, SYSTEM_INSTRUCTION, get_system_instruction, should_prefer_web_search
 
+# Ensure user-scope Git/GitHub CLI are in PATH for Streamlit's Deploy button detection
+for _extra_bin in (
+    os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Git", "cmd"),
+    os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "GitHubCLI", "bin"),
+):
+    if _extra_bin and os.path.isdir(_extra_bin) and _extra_bin.lower() not in os.environ.get("PATH", "").lower():
+        os.environ["PATH"] = _extra_bin + os.pathsep + os.environ.get("PATH", "")
+
 # Load environment variables from .env
 load_dotenv()
 
