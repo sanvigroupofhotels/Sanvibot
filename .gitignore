@@ -4,6 +4,5 @@ environment.yml
 .venv/
 __pycache__/
 *.pyc
-chat_sessions.json
 *.tmp
 dom.html
