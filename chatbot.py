@@ -103,16 +103,26 @@ _CHAT_GEN_CONFIG_NATIVE_SEARCH = types.GenerateContentConfig(
 )
 
 # --- PERSISTENT SESSION STORAGE (IN-MEMORY CACHE + NON-BLOCKING ASYNC DISK FLUSH) ---
+DRAFT_CHAT_ID = "__draft_new_chat__"
 _SAVE_LOCK = threading.Lock()
 _SESSIONS_MEMORY_CACHE: Optional[Dict[str, Any]] = None
 _LAST_DISK_MTIME: float = 0.0
 
 
 def _flush_sessions_to_disk(snapshot: Dict[str, Any]):
-    """Background worker that writes chat_sessions.json without blocking UI clicks."""
+    """Background worker that writes chat_sessions.json without blocking UI clicks (never saves empty chats)."""
     global _LAST_DISK_MTIME
     with _SAVE_LOCK:
         try:
+            # Never persist empty chats that have no conversation messages
+            if "sessions" in snapshot and isinstance(snapshot["sessions"], dict):
+                snapshot["sessions"] = {
+                    k: v for k, v in snapshot["sessions"].items() if v.get("messages")
+                }
+                if snapshot.get("active_chat_id") not in snapshot["sessions"]:
+                    snapshot["active_chat_id"] = (
+                        next(iter(snapshot["sessions"])) if snapshot["sessions"] else DRAFT_CHAT_ID
+                    )
             tmp_file = SESSIONS_FILE + ".tmp"
             with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(snapshot, f, indent=2, ensure_ascii=False)
@@ -134,12 +144,18 @@ def load_sessions_data() -> Dict[str, Any]:
     if "sessions_data" in st.session_state and isinstance(st.session_state["sessions_data"], dict):
         cached_sessions = st.session_state["sessions_data"].get("sessions", {})
         if "chat_photo_edit" not in cached_sessions:
+            # Strip any empty chats with 0 messages
+            for empty_k in [k for k, v in cached_sessions.items() if not v.get("messages")]:
+                del cached_sessions[empty_k]
             return st.session_state["sessions_data"]
         st.session_state.pop("sessions_data", None)
         _SESSIONS_MEMORY_CACHE = None
 
     if _SESSIONS_MEMORY_CACHE is not None:
-        if "chat_photo_edit" not in _SESSIONS_MEMORY_CACHE.get("sessions", {}):
+        cached_mem_sessions = _SESSIONS_MEMORY_CACHE.get("sessions", {})
+        if "chat_photo_edit" not in cached_mem_sessions:
+            for empty_k in [k for k, v in list(cached_mem_sessions.items()) if not v.get("messages")]:
+                del cached_mem_sessions[empty_k]
             try:
                 curr_mtime = os.path.getmtime(SESSIONS_FILE) if os.path.exists(SESSIONS_FILE) else 0.0
                 if curr_mtime <= _LAST_DISK_MTIME:
@@ -155,41 +171,36 @@ def load_sessions_data() -> Dict[str, Any]:
             with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict) and "sessions" in data and isinstance(data["sessions"], dict):
-                    data.setdefault("groups", ["Sanvi"])
+                    data.setdefault("groups", [])
+                    # Filter out any empty sessions that have no conversation started
+                    data["sessions"] = {
+                        k: s for k, s in data["sessions"].items()
+                        if k != "chat_photo_edit" and s.get("messages")
+                    }
                     for s in data["sessions"].values():
                         s.setdefault("group", None)
                         s.setdefault("pinned", False)
 
                     if data["sessions"]:
-                        if data.get("active_chat_id") not in data["sessions"]:
+                        if data.get("active_chat_id") not in data["sessions"] and data.get("active_chat_id") != DRAFT_CHAT_ID:
                             data["active_chat_id"] = next(iter(data["sessions"]))
-                        _SESSIONS_MEMORY_CACHE = data
-                        _LAST_DISK_MTIME = os.path.getmtime(SESSIONS_FILE)
-                        st.session_state["sessions_data"] = data
-                        return data
+                    else:
+                        data["active_chat_id"] = DRAFT_CHAT_ID
+                    _SESSIONS_MEMORY_CACHE = data
+                    _LAST_DISK_MTIME = os.path.getmtime(SESSIONS_FILE)
+                    st.session_state["sessions_data"] = data
+                    return data
         except Exception:
             pass
 
-    # Create default session
-    initial_id = "chat_default"
+    # Start in unsaved draft New Chat state (nothing saved until first message is sent)
     initial_data = {
-        "active_chat_id": initial_id,
+        "active_chat_id": DRAFT_CHAT_ID,
         "groups": [],
-        "sessions": {
-            initial_id: {
-                "id": initial_id,
-                "title": "New Chat",
-                "group": None,
-                "created_at": time.time(),
-                "updated_at": time.time(),
-                "pinned": False,
-                "messages": [],
-            }
-        },
+        "sessions": {},
     }
     _SESSIONS_MEMORY_CACHE = initial_data
     st.session_state["sessions_data"] = initial_data
-    save_sessions_data(initial_data)
     return initial_data
 
 
@@ -357,42 +368,20 @@ def _cb_delete_chat(s_id: str):
         if sessions:
             sessions_data["active_chat_id"] = next(iter(sessions))
         else:
-            fresh_id = f"chat_{uuid.uuid4().hex[:8]}"
-            sessions[fresh_id] = {
-                "id": fresh_id,
-                "title": "New Chat",
-                "created_at": time.time(),
-                "updated_at": time.time(),
-                "pinned": False,
-                "group": None,
-                "messages": [],
-            }
-            sessions_data["active_chat_id"] = fresh_id
+            sessions_data["active_chat_id"] = DRAFT_CHAT_ID
     save_sessions_data(sessions_data)
     st.session_state["pending_toast"] = ("Chat deleted", "🗑️")
 
 
 def _cb_new_chat(group_name: Optional[str] = None):
-    """Create a new chat in a single rerun pass."""
+    """Switch to unsaved draft New Chat view without saving an empty chat to storage or sidebar."""
     sessions_data = load_sessions_data()
     sessions = sessions_data["sessions"]
-    new_id = f"chat_{uuid.uuid4().hex[:8]}"
-    sessions[new_id] = {
-        "id": new_id,
-        "title": "New Chat",
-        "group": group_name,
-        "created_at": time.time(),
-        "updated_at": time.time(),
-        "pinned": False,
-        "messages": [],
-    }
-    sessions_data["active_chat_id"] = new_id
-    save_sessions_data(sessions_data)
-    hist = st.session_state.get("nav_history", [])
-    idx = st.session_state.get("nav_index", 0)
-    new_hist = hist[:idx + 1] + [new_id]
-    st.session_state["nav_history"] = new_hist
-    st.session_state["nav_index"] = len(new_hist) - 1
+    # Prune any empty chats
+    for empty_k in [k for k, v in sessions.items() if not v.get("messages")]:
+        del sessions[empty_k]
+    sessions_data["active_chat_id"] = DRAFT_CHAT_ID
+    st.session_state["draft_chat_group"] = group_name
 
 
 def _cb_nav_step(direction: str):
@@ -436,21 +425,42 @@ def _cb_nav_step(direction: str):
 
 
 def _cb_submit_prompt(direct_prompt: Optional[str] = None, state_key: Optional[str] = None):
-    """Queue user message before the rerun starts so user bubble + streaming happen in 1 single pass."""
+    """Queue user message before the rerun starts; creates and saves a new session only when first message is sent."""
     raw = direct_prompt if direct_prompt is not None else (st.session_state.get(state_key, "") if state_key else "")
     prompt_text = (raw or "").strip()
     if not prompt_text:
         return
     sessions_data = load_sessions_data()
+    sessions = sessions_data["sessions"]
     active_id = sessions_data.get("active_chat_id")
-    current_session = sessions_data["sessions"].get(active_id)
-    if not current_session:
-        return
-    if current_session.get("title") == "New Chat":
-        clean_title = prompt_text.split("\n")[0]
-        current_session["title"] = (clean_title[:32] + "...") if len(clean_title) > 32 else clean_title
-    current_session.setdefault("messages", []).append({"role": "user", "content": prompt_text})
-    current_session["updated_at"] = time.time()
+    clean_title = prompt_text.split("\n")[0]
+    computed_title = (clean_title[:32] + "...") if len(clean_title) > 32 else clean_title
+
+    if active_id == DRAFT_CHAT_ID or active_id not in sessions:
+        new_id = f"chat_{uuid.uuid4().hex[:8]}"
+        current_session = {
+            "id": new_id,
+            "title": computed_title,
+            "group": st.session_state.pop("draft_chat_group", None),
+            "created_at": time.time(),
+            "updated_at": time.time(),
+            "pinned": False,
+            "messages": [{"role": "user", "content": prompt_text}],
+        }
+        sessions[new_id] = current_session
+        sessions_data["active_chat_id"] = new_id
+        hist = [c for c in st.session_state.get("nav_history", []) if c != DRAFT_CHAT_ID]
+        idx = min(st.session_state.get("nav_index", 0), max(0, len(hist) - 1))
+        new_hist = hist[:idx + 1] + [new_id] if hist else [new_id]
+        st.session_state["nav_history"] = new_hist
+        st.session_state["nav_index"] = len(new_hist) - 1
+    else:
+        current_session = sessions[active_id]
+        if current_session.get("title") == "New Chat":
+            current_session["title"] = computed_title
+        current_session.setdefault("messages", []).append({"role": "user", "content": prompt_text})
+        current_session["updated_at"] = time.time()
+
     save_sessions_data(sessions_data)
     st.session_state["pending_prompt"] = prompt_text
     if state_key in ("hero_text_input", "hero_chat_input"):
@@ -752,19 +762,22 @@ def run_streamlit_app():
             gap: 2px !important;
         }
 
-        /* Chat History Navigation Bar: ‹  › Buttons (placed right above Groups / Ungrouped history) */
+        /* Chat History Navigation Bar: ‹  › Buttons (right-aligned right above Groups / Ungrouped history) */
         div[class*="st-key-sidebar_nav"] {
-            margin-top: 8px !important;
+            margin-top: 6px !important;
             margin-bottom: 0 !important;
+            width: 100% !important;
         }
         div[class*="st-key-sidebar_nav"] [data-testid="stHorizontalBlock"],
         .sidebar-nav-container [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             align-items: center !important;
+            justify-content: flex-end !important;
             gap: 4px !important;
-            padding: 0 !important;
+            padding: 0 2px !important;
             margin: 0 !important;
+            width: 100% !important;
             min-height: unset !important;
             background: transparent !important;
         }
@@ -780,10 +793,11 @@ def run_streamlit_app():
             opacity: 1 !important;
             pointer-events: auto !important;
         }
-        div[class*="st-key-sidebar_nav"] [data-testid="stHorizontalBlock"] > div:last-child,
-        .sidebar-nav-container [data-testid="stHorizontalBlock"] > div:last-child {
+        div[class*="st-key-sidebar_nav"] [data-testid="stHorizontalBlock"] > div:first-child,
+        .sidebar-nav-container [data-testid="stHorizontalBlock"] > div:first-child {
             flex: 1 1 auto !important;
             width: auto !important;
+            min-width: 0 !important;
             max-width: none !important;
         }
         div[class*="st-key-nav_arrow_"] button,
@@ -1732,9 +1746,30 @@ def run_streamlit_app():
             }
         }
 
-        /* Bottom chat input styling */
+        /* Bottom & Hero chat input styling */
         [data-testid="stChatInput"] {
             border-radius: 26px !important;
+        }
+        div[class*="st-key-hero_chat_input_box"] [data-testid="stChatInput"] {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28) !important;
+        }
+
+        /* Hero Suggestion Chips (Desktop & Mobile) */
+        div[class*="st-key-hero_suggestions_box"] button {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 12px !important;
+            padding: 0.62rem 1rem !important;
+            color: #d4d4d8 !important;
+            font-size: 0.88rem !important;
+            font-weight: 500 !important;
+            transition: all 0.15s ease !important;
+        }
+        div[class*="st-key-hero_suggestions_box"] button:hover {
+            background-color: rgba(255, 255, 255, 0.07) !important;
+            border-color: rgba(255, 255, 255, 0.22) !important;
+            color: #ffffff !important;
+            transform: translateY(-1px);
         }
 
         /* Bottom disclaimer caption */
@@ -1763,8 +1798,8 @@ def run_streamlit_app():
         /* =========================================================
            MOBILE & TOUCH RESPONSIVENESS (ZERO DESKTOP REGRESSION)
            ========================================================= */
-        @media (hover: none), (pointer: coarse) {
-            /* Always show three-dots menu trigger on touch devices where hover does not exist */
+        @media (hover: none) {
+            /* Always show three-dots menu trigger on non-hover touch devices (phones/tablets) */
             div[class*="st-key-chat_item_"] [data-testid="stHorizontalBlock"] > div:last-child,
             .chat-item-row [data-testid="stHorizontalBlock"] > div:last-child,
             [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.stButton):has([data-testid="stPopover"]) > div:last-child {
@@ -1842,7 +1877,13 @@ def run_streamlit_app():
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
             }
-            div[class*="st-key-sidebar_nav"] [data-testid="stHorizontalBlock"] > div {
+            div[class*="st-key-sidebar_nav"] [data-testid="stHorizontalBlock"] > div:first-child {
+                flex: 1 1 auto !important;
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: none !important;
+            }
+            div[class*="st-key-sidebar_nav"] [data-testid="stHorizontalBlock"] > div:not(:first-child) {
                 flex: 0 0 28px !important;
                 width: 28px !important;
                 min-width: 28px !important;
@@ -1931,20 +1972,7 @@ def run_streamlit_app():
                     st.session_state["nav_history"] = [c for c in st.session_state["nav_history"] if c != target_id]
                     st.session_state["nav_index"] = min(st.session_state.get("nav_index", 0), max(0, len(st.session_state["nav_history"]) - 1))
                 if sessions_data["active_chat_id"] == target_id:
-                    if sessions:
-                        sessions_data["active_chat_id"] = next(iter(sessions))
-                    else:
-                        fresh_id = f"chat_{uuid.uuid4().hex[:8]}"
-                        sessions[fresh_id] = {
-                            "id": fresh_id,
-                            "title": "New Chat",
-                            "created_at": time.time(),
-                            "updated_at": time.time(),
-                            "pinned": False,
-                            "group": None,
-                            "messages": [],
-                        }
-                        sessions_data["active_chat_id"] = fresh_id
+                    sessions_data["active_chat_id"] = next(iter(sessions)) if sessions else DRAFT_CHAT_ID
                 save_sessions_data(sessions_data)
                 st.toast("Chat deleted", icon="🗑️")
                 st.rerun()
@@ -1956,9 +1984,9 @@ def run_streamlit_app():
 
     active_chat_id = sessions_data["active_chat_id"]
 
-    # Ensure active session exists
-    if active_chat_id not in sessions:
-        active_chat_id = next(iter(sessions))
+    # Ensure active session exists (or preserve DRAFT_CHAT_ID when viewing unsaved New Chat)
+    if active_chat_id != DRAFT_CHAT_ID and active_chat_id not in sessions:
+        active_chat_id = next(iter(sessions)) if sessions else DRAFT_CHAT_ID
         sessions_data["active_chat_id"] = active_chat_id
 
     # Initialize or synchronize navigation history stack
@@ -2018,7 +2046,15 @@ def run_streamlit_app():
             save_sessions_data(sessions_data)
             st.rerun()
 
-    current_session = sessions[active_chat_id]
+    if active_chat_id == DRAFT_CHAT_ID or active_chat_id not in sessions:
+        current_session = {
+            "id": DRAFT_CHAT_ID,
+            "title": "New Chat",
+            "group": st.session_state.get("draft_chat_group"),
+            "messages": [],
+        }
+    else:
+        current_session = sessions[active_chat_id]
     current_messages = current_session.get("messages", [])
 
     # Check API Key
@@ -2062,9 +2098,9 @@ def run_streamlit_app():
             label_visibility="collapsed",
         )
 
-        # 3. Chat History Navigation Arrows: ‹  › (placed after Search and directly above Groups / Ungrouped chats)
+        # 3. Chat History Navigation Arrows: ‹  › (right-aligned after Search and directly above Groups / Ungrouped chats)
         with st.container(key="sidebar_nav"):
-            col_arr1, col_arr2, col_arr_space = st.columns([0.14, 0.14, 0.72])
+            col_arr_space, col_arr1, col_arr2 = st.columns([0.72, 0.14, 0.14])
             with col_arr1:
                 st.button(
                     "‹",
@@ -2086,7 +2122,7 @@ def run_streamlit_app():
         # --- GROUPS DISPLAYED AS SIMPLE HEADINGS (e.g. "Sanvi ▾" and "Ungrouped ▾") ---
         # 1. Primary Groups (e.g. Sanvi)
         for grp in all_groups:
-            grp_chats = [s for s in sessions.values() if s.get("group") == grp]
+            grp_chats = [s for s in sessions.values() if s.get("group") == grp and s.get("messages")]
             grp_chats = sorted(grp_chats, key=lambda s: (not s.get("pinned", False), -s.get("updated_at", 0)))
 
             if search_query.strip():
@@ -2145,7 +2181,10 @@ def run_streamlit_app():
                 )
 
         # 2. Ungrouped Chats Section (matching "Ungrouped ▾" in screenshot)
-        ungrouped_chats = [s for s in sessions.values() if not s.get("group") or s.get("group") not in all_groups]
+        ungrouped_chats = [
+            s for s in sessions.values()
+            if (not s.get("group") or s.get("group") not in all_groups) and s.get("messages")
+        ]
         ungrouped_chats = sorted(ungrouped_chats, key=lambda s: (not s.get("pinned", False), -s.get("updated_at", 0)))
 
         if search_query.strip():
@@ -2218,35 +2257,36 @@ def run_streamlit_app():
 
         # Suggestion Chips under the centered input box
         st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
-        col_c1, col_c2 = st.columns(2)
+        with st.container(key="hero_suggestions_box"):
+            col_c1, col_c2 = st.columns(2)
 
-        with col_c1:
-            st.button(
-                "💡 Brainstorm creative ideas",
-                use_container_width=True,
-                on_click=_cb_submit_prompt,
-                kwargs={"direct_prompt": "Give me 5 creative ideas for a productive weekend project."},
-            )
-            st.button(
-                "🔍 Summarize key concepts",
-                use_container_width=True,
-                on_click=_cb_submit_prompt,
-                kwargs={"direct_prompt": "Explain the key differences between synchronous and asynchronous programming simply."},
-            )
+            with col_c1:
+                st.button(
+                    "💡 Brainstorm creative ideas",
+                    use_container_width=True,
+                    on_click=_cb_submit_prompt,
+                    kwargs={"direct_prompt": "Give me 5 creative ideas for a productive weekend project."},
+                )
+                st.button(
+                    "🔍 Summarize key concepts",
+                    use_container_width=True,
+                    on_click=_cb_submit_prompt,
+                    kwargs={"direct_prompt": "Explain the key differences between synchronous and asynchronous programming simply."},
+                )
 
-        with col_c2:
-            st.button(
-                "📝 Help me draft a message",
-                use_container_width=True,
-                on_click=_cb_submit_prompt,
-                kwargs={"direct_prompt": "Help me draft a concise, polite follow-up email to a colleague."},
-            )
-            st.button(
-                "💻 Write & debug code",
-                use_container_width=True,
-                on_click=_cb_submit_prompt,
-                kwargs={"direct_prompt": "Write a Python script to monitor a folder and organize incoming files by extension."},
-            )
+            with col_c2:
+                st.button(
+                    "📝 Help me draft a message",
+                    use_container_width=True,
+                    on_click=_cb_submit_prompt,
+                    kwargs={"direct_prompt": "Help me draft a concise, polite follow-up email to a colleague."},
+                )
+                st.button(
+                    "💻 Write & debug code",
+                    use_container_width=True,
+                    on_click=_cb_submit_prompt,
+                    kwargs={"direct_prompt": "Write a Python script to monitor a folder and organize incoming files by extension."},
+                )
 
     # --- CASE 2: ACTIVE CONVERSATION (TOP-DOWN FLOW WITH FIXED BOTTOM INPUT) ---
     else:
@@ -2561,6 +2601,36 @@ def run_streamlit_app():
                                 topTitle.textContent = titleText;
                             }
                             // On mobile viewports (<= 768px), auto-close the slide-over sidebar drawer after selecting a chat
+                            const win = getAppWin();
+                            if (win && win.innerWidth <= 768) {
+                                setTimeout(function() {
+                                    const closeBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"] button, [data-testid="stSidebarHeader"] button');
+                                    if (closeBtn) {
+                                        try { closeBtn.click(); } catch(err) {}
+                                    }
+                                }, 90);
+                            }
+                            return;
+                        }
+
+                        // 2. "+ New" button click: clear active sidebar highlight & set topbar title to "New Chat" in 0ms
+                        const newChatBtn = target.closest('[data-testid="stSidebar"] div[class*="st-key-btn_new_chat"] button');
+                        if (newChatBtn) {
+                            const sidebar = doc.querySelector('[data-testid="stSidebar"]');
+                            if (sidebar) {
+                                sidebar.querySelectorAll('.sanvi-opt-target').forEach(function(el) {
+                                    el.classList.remove('sanvi-opt-target');
+                                });
+                                sidebar.classList.add('sanvi-opt-switching');
+                                if (optTimer) clearTimeout(optTimer);
+                                optTimer = setTimeout(function() {
+                                    sidebar.classList.remove('sanvi-opt-switching');
+                                }, 600);
+                            }
+                            const topTitle = doc.querySelector('.sanvibot-title');
+                            if (topTitle) {
+                                topTitle.textContent = 'New Chat';
+                            }
                             const win = getAppWin();
                             if (win && win.innerWidth <= 768) {
                                 setTimeout(function() {
