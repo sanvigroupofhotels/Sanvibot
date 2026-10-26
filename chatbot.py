@@ -2208,9 +2208,24 @@ def run_streamlit_app():
         (function() {
             if (window.__sanviUiLoaded) return;
             window.__sanviUiLoaded = true;
+            function getAppWin() {
+                try {
+                    if (document.querySelector('[data-testid="stApp"]') || document.querySelector('[data-testid="stChatInput"]')) {
+                        return window;
+                    }
+                    if (window.parent && window.parent !== window && window.parent.document &&
+                        (window.parent.document.querySelector('[data-testid="stApp"]') || window.parent.document.querySelector('[data-testid="stChatInput"]'))) {
+                        return window.parent;
+                    }
+                } catch(e) {}
+                return window;
+            }
+            function getAppDoc() {
+                try { return getAppWin().document; } catch(e) { return document; }
+            }
             function setupVoiceMic() {
                 try {
-                    const doc = (window.parent && window.parent.document) ? window.parent.document : document;
+                    const doc = getAppDoc();
                     if (!doc) return;
                     const chatInput = doc.querySelector('[data-testid="stChatInput"]');
                     if (!chatInput) return;
@@ -2233,7 +2248,7 @@ def run_streamlit_app():
                         e.preventDefault();
                         e.stopPropagation();
 
-                        const win = window.parent || window;
+                        const win = getAppWin();
                         const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition;
                         if (!SpeechRec) {
                             alert("Speech recognition is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.");
@@ -2315,8 +2330,8 @@ def run_streamlit_app():
             }
             function setupScrollFab() {
                 try {
-                    const doc = (window.parent && window.parent.document) ? window.parent.document : document;
-                    const win = window.parent || window;
+                    const doc = getAppDoc();
+                    const win = getAppWin();
                     const fab = doc.querySelector('.scroll-down-fab');
                     if (!fab) return;
 
@@ -2362,7 +2377,7 @@ def run_streamlit_app():
             }
             function setupInstantClickFeedback() {
                 try {
-                    const doc = (window.parent && window.parent.document) ? window.parent.document : document;
+                    const doc = getAppDoc();
                     if (!doc || doc.body.dataset.sanviInstantBound === '1') return;
                     doc.body.dataset.sanviInstantBound = '1';
 
