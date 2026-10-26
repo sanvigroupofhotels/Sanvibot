@@ -132,17 +132,23 @@ def load_sessions_data() -> Dict[str, Any]:
     global _SESSIONS_MEMORY_CACHE, _LAST_DISK_MTIME
 
     if "sessions_data" in st.session_state and isinstance(st.session_state["sessions_data"], dict):
-        return st.session_state["sessions_data"]
+        cached_sessions = st.session_state["sessions_data"].get("sessions", {})
+        if "chat_photo_edit" not in cached_sessions:
+            return st.session_state["sessions_data"]
+        st.session_state.pop("sessions_data", None)
+        _SESSIONS_MEMORY_CACHE = None
 
     if _SESSIONS_MEMORY_CACHE is not None:
-        try:
-            curr_mtime = os.path.getmtime(SESSIONS_FILE) if os.path.exists(SESSIONS_FILE) else 0.0
-            if curr_mtime <= _LAST_DISK_MTIME:
+        if "chat_photo_edit" not in _SESSIONS_MEMORY_CACHE.get("sessions", {}):
+            try:
+                curr_mtime = os.path.getmtime(SESSIONS_FILE) if os.path.exists(SESSIONS_FILE) else 0.0
+                if curr_mtime <= _LAST_DISK_MTIME:
+                    st.session_state["sessions_data"] = _SESSIONS_MEMORY_CACHE
+                    return _SESSIONS_MEMORY_CACHE
+            except Exception:
                 st.session_state["sessions_data"] = _SESSIONS_MEMORY_CACHE
                 return _SESSIONS_MEMORY_CACHE
-        except Exception:
-            st.session_state["sessions_data"] = _SESSIONS_MEMORY_CACHE
-            return _SESSIONS_MEMORY_CACHE
+        _SESSIONS_MEMORY_CACHE = None
 
     if os.path.exists(SESSIONS_FILE):
         try:
