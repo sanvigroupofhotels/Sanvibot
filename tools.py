@@ -198,6 +198,27 @@ def _search_google_news_rss(query: str, max_results: int = 5) -> List[Dict[str, 
     return results
 
 
+def _search_bing_web_rss(query: str, max_results: int = 5) -> List[Dict[str, str]]:
+    """Fetch general web search snippets via Bing RSS endpoint (fast & works reliably on cloud datacenter IPs)."""
+    encoded = urllib.parse.quote_plus(query)
+    rss_url = f"https://www.bing.com/search?q={encoded}&format=rss"
+    resp = _HTTP_SESSION.get(rss_url, timeout=3.5)
+    resp.raise_for_status()
+    root = ET.fromstring(resp.content)
+    results: List[Dict[str, str]] = []
+    for item in root.findall(".//item")[:max_results]:
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        desc = re.sub(r"<[^>]+>", "", (item.findtext("description") or "")).strip()
+        if title:
+            results.append({
+                "title": title,
+                "snippet": desc,
+                "url": link,
+            })
+    return results
+
+
 def _search_duckduckgo_html(query: str, max_results: int = 5) -> List[Dict[str, str]]:
     """Fetch general web search snippets via DuckDuckGo HTML endpoint using a warm HTTP session."""
     resp = _HTTP_SESSION.post(
@@ -238,42 +259,7 @@ def _search_duckduckgo_html(query: str, max_results: int = 5) -> List[Dict[str, 
     return results
 
 
-_SEARCH_CLIENT = None
-
-
-def _get_search_client():
-    """Return a cached genai.Client for grounded web search sub-calls."""
-    global _SEARCH_CLIENT
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        return None
-    if _SEARCH_CLIENT is None:
-        _SEARCH_CLIENT = genai.Client(api_key=api_key)
-    return _SEARCH_CLIENT
-
-
-def _fetch_grounded_summary(query: str, now_str: str) -> str:
-    """Fast grounded web search using active 2026 flash-lite/flash models (no retired 2.0/2.5 models)."""
-    client = _get_search_client()
-    if client is None:
-        return ""
-    for search_model in ("gemini-3.5-flash-lite", "gemini-flash-latest"):
-        try:
-            res = client.models.generate_content(
-                model=search_model,
-                contents=f"Current date: {now_str}. Provide a concise, factual answer with dates for: {query}",
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(google_search=types.GoogleSearch())],
-                ),
-            )
-            if res and res.text:
-                return f"--- Grounded Web Summary ({search_model}) ---\n{res.text.strip()}"
-        except Exception:
-            continue
-    return ""
-
-
-def web_search(query: str, max_results: int = 5) -> str:
+def web_search(query: str, max_results: int = 6) -> str:
     """Search the live internet for up-to-date information, current officeholders (CM, PM, President, CEO, etc.),
     today's news, elections, current events, mutable facts, weather, sports, or prices.
 
@@ -283,7 +269,7 @@ def web_search(query: str, max_results: int = 5) -> str:
 
     Args:
         query: The search query string to look up online.
-        max_results: Maximum number of search results to return (default 5).
+        max_results: Maximum number of search results to return (default 6).
     """
     norm_q = " ".join(query.strip().lower().split())
     now_ts = time.time()
@@ -294,31 +280,32 @@ def web_search(query: str, max_results: int = 5) -> str:
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sections: List[str] = [f"Search Query: {query}\nTimestamp: {now_str}"]
 
-    # Run Grounded Search, DuckDuckGo HTML, and Google News RSS concurrently in parallel threads
+    # Run Bing Web RSS, Google News RSS (en-IN), and DuckDuckGo HTML concurrently in parallel threads (~0.4s)
     with ThreadPoolExecutor(max_workers=3) as pool:
-        fut_grounded = pool.submit(_fetch_grounded_summary, query, now_str)
-        fut_ddg = pool.submit(_search_duckduckgo_html, query, max_results)
+        fut_bing = pool.submit(_search_bing_web_rss, query, max_results)
         fut_news = pool.submit(_search_google_news_rss, query, max_results)
+        fut_ddg = pool.submit(_search_duckduckgo_html, query, max_results)
 
+        web_results: List[Dict[str, str]] = []
         try:
-            grounded_text = fut_grounded.result(timeout=6.0)
-            if grounded_text:
-                sections.append(grounded_text)
+            web_results = fut_bing.result(timeout=3.5)
         except Exception:
             pass
 
-        try:
-            ddg_results = fut_ddg.result(timeout=4.0)
-            if ddg_results:
-                ddg_lines = ["--- Live Web Search Results ---"]
-                for i, item in enumerate(ddg_results, 1):
-                    ddg_lines.append(f"{i}. {item['title']}\n   URL: {item['url']}\n   Snippet: {item['snippet']}")
-                sections.append("\n".join(ddg_lines))
-        except Exception:
-            pass
+        if not web_results:
+            try:
+                web_results = fut_ddg.result(timeout=3.5)
+            except Exception:
+                pass
+
+        if web_results:
+            web_lines = ["--- Live Web Search Results ---"]
+            for i, item in enumerate(web_results, 1):
+                web_lines.append(f"{i}. {item['title']}\n   URL: {item['url']}\n   Snippet: {item['snippet']}")
+            sections.append("\n".join(web_lines))
 
         try:
-            news_results = fut_news.result(timeout=4.0)
+            news_results = fut_news.result(timeout=3.5)
             if news_results:
                 news_lines = ["--- Latest News Headlines (Google News RSS) ---"]
                 for i, item in enumerate(news_results, 1):
@@ -758,12 +745,10 @@ _EXPLICIT_WEB_RE = re.compile(
 )
 
 _OFFICEHOLDER_OR_ROLE_RE = re.compile(
-    r"(\b(who\s+is|who's|whats\s+the\s+name\s+of|name\s+the|current|present|incumbent|new)\b.{0,40}"
     r"\b(cm|chief\s+minister|deputy\s+cm|pm|prime\s+minister|president|vice\s+president|governor|"
-    r"minister|mayor|ceo|cfo|cto|coo|chairman|chairperson|md|managing\s+director|founder|owner|"
-    r"chief\s+justice|speaker|commissioner|secretary|ambassador|captain|coach|champion|richest|"
-    r"leader|head|mp|mla)\b)"
-    r"|(\b(cm|chief\s+minister|pm|prime\s+minister|president|governor|ceo|mayor|captain|champion)\s+of\b)",
+    r"home\s+minister|finance\s+minister|defense\s+minister|defence\s+minister|foreign\s+minister|"
+    r"mayor|ceo|cfo|cto|coo|chairman|chairperson|managing\s+director|chief\s+justice|"
+    r"speaker|commissioner|ambassador|captain|coach|champion|richest\s+person|richest\s+man|leader\s+of)\b",
     re.IGNORECASE,
 )
 

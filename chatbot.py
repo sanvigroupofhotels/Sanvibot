@@ -29,7 +29,7 @@ from google import genai
 from google.genai import types
 import streamlit as st
 import streamlit.components.v1 as components
-from tools import ALL_TOOLS, SYSTEM_INSTRUCTION, get_system_instruction, should_prefer_web_search
+from tools import ALL_TOOLS, SYSTEM_INSTRUCTION, get_system_instruction, should_prefer_web_search, web_search
 
 # Ensure user-scope Git/GitHub CLI are in PATH for Streamlit's Deploy button detection
 for _extra_bin in (
@@ -93,13 +93,15 @@ _CHAT_GEN_CONFIG_WEB_SEARCH = types.GenerateContentConfig(
     tools=ALL_TOOLS,
 )
 
-_CHAT_GEN_CONFIG_NATIVE_SEARCH = types.GenerateContentConfig(
+_CHAT_GEN_CONFIG_DIRECT_GROUNDED = types.GenerateContentConfig(
     system_instruction=(
-        f"You are SanviBot, a helpful AI assistant. Current Date: {datetime.date.today().strftime('%B %d, %Y')}. "
-        f"Always use Google Search to verify current officeholders, roles, news, prices, and time-sensitive facts "
-        f"as of {datetime.date.today().year}, and answer directly and concisely."
+        "You are SanviBot, a helpful AI assistant. "
+        "CRITICAL RULE: When [LIVE WEB SEARCH RESULTS] are provided in the prompt, you MUST treat those live search "
+        "results and latest news headlines as the authoritative, up-to-date ground truth. "
+        "Ignore your outdated pre-trained knowledge cutoff whenever the live web search results show a newer "
+        "officeholder (e.g., Chief Minister, Prime Minister, President, CEO), recent election outcome, or current fact. "
+        "Answer the user's question directly, naturally, and concisely."
     ),
-    tools=[types.Tool(google_search=types.GoogleSearch())],
 )
 
 # --- PERSISTENT SESSION STORAGE (IN-MEMORY CACHE + NON-BLOCKING ASYNC DISK FLUSH) ---
@@ -256,29 +258,35 @@ def stream_chat_response(
     prompt: str,
     model: str = DEFAULT_MODEL,
 ) -> Generator[str, None, None]:
-    """Call the LLM with short-term conversational memory and single-pass native Google Search grounding for live queries."""
+    """Call the LLM with short-term conversational memory and deterministic live web search for time-sensitive queries."""
     history = format_history_for_sdk(history_messages)
 
-    # Fast single-pass path for online/time-sensitive queries: use native GoogleSearch() grounding directly
-    # (1 streaming API call instead of Outer LLM -> Python tool -> Inner LLM -> Scrapers -> Outer LLM)
+    # Deterministic fast single-pass path for online/time-sensitive queries on both Local & Cloud:
+    # Run the Python web_search scraper directly (~0.4s) and inject the live results into 1 streaming LLM call
+    # so the model can NEVER skip the tool call or fall back to outdated pre-trained weights.
     if should_prefer_web_search(prompt):
+        live_search_context = ""
         try:
+            live_search_context = web_search(prompt)
+        except Exception:
+            live_search_context = ""
+
+        if live_search_context and ("--- Live Web Search Results ---" in live_search_context or "--- Latest News Headlines" in live_search_context):
+            augmented_prompt = (
+                f"User Question: {prompt}\n\n"
+                f"[LIVE WEB SEARCH RESULTS - AUTHORITATIVE CURRENT DATA]:\n{live_search_context}\n\n"
+                f"Instruction: Answer the User Question directly and concisely using the [LIVE WEB SEARCH RESULTS] above "
+                f"as the authoritative current truth. Override any older pre-trained memory."
+            )
             chat = client.chats.create(
                 model=model,
                 history=history,
-                config=_CHAT_GEN_CONFIG_NATIVE_SEARCH,
+                config=_CHAT_GEN_CONFIG_DIRECT_GROUNDED,
             )
-            response_stream = chat.send_message_stream(prompt)
-            yielded_any = False
-            for chunk in response_stream:
+            for chunk in chat.send_message_stream(augmented_prompt):
                 if chunk.text:
-                    yielded_any = True
                     yield chunk.text
-            if yielded_any:
-                return
-        except Exception:
-            # Fallback to Python web_search tool if the selected model does not support native GoogleSearch
-            pass
+            return
 
         chat = client.chats.create(
             model=model,
