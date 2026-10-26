@@ -1650,6 +1650,7 @@ def run_streamlit_app():
         /* Centered New Chat State */
         .hero-center-box {
             margin-top: 15vh;
+            margin-top: 15dvh;
             margin-bottom: 2rem;
             text-align: center;
         }
@@ -1658,7 +1659,7 @@ def run_streamlit_app():
             margin-bottom: 0.6rem;
         }
         .hero-greeting {
-            font-size: 1.95rem; /* Reduced by 2 points (~31px) from 2.2rem per instruction */
+            font-size: clamp(1.4rem, 1rem + 2vw, 1.95rem); /* 1.95rem on desktop; fluidly scales on mobile */
             font-weight: 700;
             color: #f4f4f5;
             letter-spacing: -0.02em;
@@ -1742,6 +1743,139 @@ def run_streamlit_app():
             font-size: 0.74rem;
             color: #71717a;
             margin-top: 0.4rem;
+        }
+
+        /* Prevent long URLs, code blocks, or tables from overflowing chat bubbles on any screen */
+        [data-testid="stChatMessage"] {
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+        }
+        [data-testid="stChatMessage"] pre {
+            overflow-x: auto !important;
+            max-width: 100% !important;
+        }
+        [data-testid="stChatMessage"] table {
+            display: block !important;
+            overflow-x: auto !important;
+            max-width: 100% !important;
+        }
+
+        /* =========================================================
+           MOBILE & TOUCH RESPONSIVENESS (ZERO DESKTOP REGRESSION)
+           ========================================================= */
+        @media (hover: none), (pointer: coarse) {
+            /* Always show three-dots menu trigger on touch devices where hover does not exist */
+            div[class*="st-key-chat_item_"] [data-testid="stHorizontalBlock"] > div:last-child,
+            .chat-item-row [data-testid="stHorizontalBlock"] > div:last-child,
+            [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.stButton):has([data-testid="stPopover"]) > div:last-child {
+                opacity: 0.85 !important;
+                pointer-events: auto !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .block-container {
+                max-width: 100% !important;
+                padding-top: 2.3rem !important;
+                padding-left: 0.85rem !important;
+                padding-right: 0.85rem !important;
+                padding-bottom: 5.5rem !important;
+            }
+
+            .sanvibot-topbar-left {
+                padding-top: 0.1rem !important;
+            }
+            .sanvibot-title {
+                font-size: 1.02rem !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                max-width: 82vw !important;
+            }
+
+            /* Compact hero section on mobile so greeting, input, and chips fit comfortably */
+            .hero-center-box {
+                margin-top: 4vh !important;
+                margin-top: 4dvh !important;
+                margin-bottom: 1.1rem !important;
+            }
+            .hero-sparkle {
+                font-size: 2rem !important;
+                margin-bottom: 0.35rem !important;
+            }
+            .hero-subtitle {
+                font-size: 0.88rem !important;
+                margin-bottom: 1rem !important;
+                padding: 0 0.5rem !important;
+            }
+
+            /* Collapse empty desktop spacer columns in message rows on mobile */
+            [data-testid="stHorizontalBlock"]:has(.user-bubble-wrapper) > [data-testid="stColumn"]:first-child,
+            [data-testid="stHorizontalBlock"]:has(.bot-bubble-wrapper) > [data-testid="stColumn"]:last-child {
+                display: none !important;
+            }
+            [data-testid="stHorizontalBlock"]:has(.user-bubble-wrapper) > [data-testid="stColumn"]:last-child,
+            [data-testid="stHorizontalBlock"]:has(.bot-bubble-wrapper) > [data-testid="stColumn"]:first-child {
+                width: 100% !important;
+                min-width: 100% !important;
+                flex: 1 1 100% !important;
+            }
+
+            .user-bubble-wrapper {
+                margin-bottom: 0.9rem !important;
+            }
+            .user-bubble-wrapper [data-testid="stChatMessage"] {
+                max-width: 90% !important;
+                padding: 0.7rem 1rem !important;
+                font-size: 0.94rem !important;
+            }
+            .bot-bubble-wrapper {
+                margin-bottom: 1.1rem !important;
+            }
+            .bot-bubble-wrapper [data-testid="stChatMessage"] {
+                font-size: 0.94rem !important;
+                line-height: 1.6 !important;
+            }
+
+            /* Prevent Streamlit from stacking sidebar horizontal rows (‹ ›, group headers, chat items) on <640px */
+            [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+            }
+            div[class*="st-key-sidebar_nav"] [data-testid="stHorizontalBlock"] > div {
+                flex: 0 0 28px !important;
+                width: 28px !important;
+                min-width: 28px !important;
+                max-width: 28px !important;
+            }
+            div[class*="st-key-group_header_"] [data-testid="stHorizontalBlock"] > div:first-child {
+                min-width: 0 !important;
+                width: auto !important;
+            }
+            div[class*="st-key-group_header_"] [data-testid="stHorizontalBlock"] > div:last-child {
+                flex: 0 0 22px !important;
+                width: 22px !important;
+                min-width: 22px !important;
+                max-width: 22px !important;
+            }
+
+            /* Keep three-dots visible on mobile viewports */
+            div[class*="st-key-chat_item_"] [data-testid="stHorizontalBlock"] > div:last-child {
+                opacity: 0.85 !important;
+                pointer-events: auto !important;
+            }
+
+            /* 16px input font-size on mobile prevents iOS Safari / Android Chrome forced page zoom on focus */
+            [data-testid="stChatInput"] textarea,
+            [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
+                font-size: 16px !important;
+            }
+
+            .scroll-down-fab {
+                right: 14px !important;
+                width: 30px !important;
+                height: 30px !important;
+            }
         }
     </style>
     """
@@ -2425,6 +2559,16 @@ def run_streamlit_app():
                             const topTitle = doc.querySelector('.sanvibot-title');
                             if (topTitle && titleText) {
                                 topTitle.textContent = titleText;
+                            }
+                            // On mobile viewports (<= 768px), auto-close the slide-over sidebar drawer after selecting a chat
+                            const win = getAppWin();
+                            if (win && win.innerWidth <= 768) {
+                                setTimeout(function() {
+                                    const closeBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"] button, [data-testid="stSidebarHeader"] button');
+                                    if (closeBtn) {
+                                        try { closeBtn.click(); } catch(err) {}
+                                    }
+                                }, 90);
                             }
                         }
                     }, { passive: true, capture: true });
